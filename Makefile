@@ -1,4 +1,4 @@
-rp:
+build:
 	go build -ldflags "-X main.gitCommit=$(shell git rev-parse --short HEAD)$(shell [[ $$(git status --porcelain) = "" ]] || echo -dirty)" ./cmd/rp
 
 clean:
@@ -14,4 +14,4 @@ image:
 test: generate
 	go test ./...
 
-.PHONY: clean generate image rp test
+.PHONY: clean generate image build test
