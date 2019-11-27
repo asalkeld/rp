@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 
 	"github.com/jim-minter/rp/pkg/api"
@@ -31,6 +32,10 @@ type backend struct {
 	stopping atomic.Value
 
 	domain string
+
+	TenantID      string `envconfig:"AZURE_TENANT_ID" required:"true"`
+	ResourceGroup string `envconfig:"RESOURCEGROUP" required:"true"`
+	PullSecret    string `envconfig:"PULL_SECRET" required:"true"`
 }
 
 // Runnable represents a runnable object
@@ -45,6 +50,9 @@ func NewBackend(ctx context.Context, log *logrus.Entry, env env.Interface, db da
 	b := &backend{
 		baseLog: log,
 		db:      db,
+	}
+	if err := envconfig.Process("", &b); err != nil {
+		return nil, err
 	}
 
 	b.domain, err = env.DNS(ctx)

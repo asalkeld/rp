@@ -13,7 +13,7 @@ var (
 )
 
 // Validate validates an OpenShift cluster's credentials
-func (occ *OpenShiftClusterCredentials) Validate(ctx context.Context, resourceID string, current *api.OpenShiftCluster) error {
+func (occ *OpenShiftClusterCredentials) Validate(ctx context.Context, resourceID string, current *api.OpenShiftCluster, tenantID, location string) error {
 	err := occ.validate(resourceID)
 	if err != nil {
 		return err

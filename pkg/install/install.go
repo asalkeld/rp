@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	"github.com/sirupsen/logrus"
 
@@ -38,6 +39,8 @@ type Installer struct {
 	deployments            resources.DeploymentsClient
 	groups                 resources.GroupsClient
 	accounts               storage.AccountsClient
+
+	TenantID string `envconfig:"AZURE_TENANT_ID" required:"true"`
 }
 
 func NewInstaller(log *logrus.Entry, db database.OpenShiftClusters, domain string, authorizer autorest.Authorizer, subscriptionID string) *Installer {
@@ -71,6 +74,10 @@ func NewInstaller(log *logrus.Entry, db database.OpenShiftClusters, domain strin
 	d.accounts.Authorizer = authorizer
 
 	d.deployments.Client.PollingDuration = time.Hour
+
+	if err := envconfig.Process("", &d); err != nil {
+		return nil
+	}
 
 	return d
 }

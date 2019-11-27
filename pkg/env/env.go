@@ -4,8 +4,6 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/sirupsen/logrus"
@@ -23,10 +21,10 @@ type Interface interface {
 	Authenticated(h http.Handler) http.Handler
 }
 
-func NewEnv(ctx context.Context, log *logrus.Entry, subscriptionId, resourceGroup string) (Interface, error) {
-	if strings.ToLower(os.Getenv("RP_MODE")) == "development" {
+func NewEnv(ctx context.Context, log *logrus.Entry) (Interface, error) {
+	if dev.IsDevelopment() {
 		log.Warn("running in development mode")
-		return dev.New(ctx, log, subscriptionId, resourceGroup)
+		return dev.New(ctx, log)
 	}
-	return prod.New(ctx, log, subscriptionId, resourceGroup)
+	return prod.New(ctx, log)
 }

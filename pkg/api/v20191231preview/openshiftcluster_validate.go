@@ -24,8 +24,8 @@ var (
 )
 
 // Validate validates an OpenShift cluster
-func (oc *OpenShiftCluster) Validate(ctx context.Context, resourceID string, current *api.OpenShiftCluster) error {
-	err := oc.validate(resourceID)
+func (oc *OpenShiftCluster) Validate(ctx context.Context, resourceID string, current *api.OpenShiftCluster, tenantID, location string) error {
+	err := oc.validate(resourceID, location)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func (oc *OpenShiftCluster) Validate(ctx context.Context, resourceID string, cur
 	internal := &api.OpenShiftCluster{}
 	oc.ToInternal(internal)
 
-	masterSubnet, err := subnet.Get(ctx, &internal.Properties.ServicePrincipalProfile, internal.Properties.MasterProfile.SubnetID)
+	masterSubnet, err := subnet.Get(ctx, &internal.Properties.ServicePrincipalProfile, internal.Properties.MasterProfile.SubnetID, tenantID)
 	if err != nil {
 		// TODO: return friendly error if SP is not authorised
 		if err, ok := err.(autorest.DetailedError); ok && err.StatusCode == http.StatusNotFound {
@@ -42,7 +42,7 @@ func (oc *OpenShiftCluster) Validate(ctx context.Context, resourceID string, cur
 		return err
 	}
 
-	workerSubnet, err := subnet.Get(ctx, &internal.Properties.ServicePrincipalProfile, internal.Properties.WorkerProfiles[0].SubnetID)
+	workerSubnet, err := subnet.Get(ctx, &internal.Properties.ServicePrincipalProfile, internal.Properties.WorkerProfiles[0].SubnetID, tenantID)
 	if err != nil {
 		// TODO: return friendly error if SP is not authorised
 		if err, ok := err.(autorest.DetailedError); ok && err.StatusCode == http.StatusNotFound {
@@ -63,7 +63,7 @@ func (oc *OpenShiftCluster) Validate(ctx context.Context, resourceID string, cur
 	return oc.validateDelta(OpenShiftClusterToExternal(current))
 }
 
-func (oc *OpenShiftCluster) validate(resourceID string) error {
+func (oc *OpenShiftCluster) validate(resourceID, location string) error {
 	r, err := azure.ParseResourceID(resourceID)
 	if err != nil {
 		return err

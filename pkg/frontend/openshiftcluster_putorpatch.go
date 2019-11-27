@@ -119,7 +119,7 @@ func (f *frontend) _putOrPatchOpenShiftCluster(r *request) ([]byte, bool, error)
 		return nil, false, api.NewCloudError(http.StatusBadRequest, api.CloudErrorCodeInvalidRequestContent, "", "The request content was invalid and could not be deserialized: %q.", err)
 	}
 
-	err = external.Validate(r.context, r.resourceID, doc.OpenShiftCluster)
+	err = external.Validate(r.context, r.resourceID, doc.OpenShiftCluster, f.TenantID, f.Location)
 	if err != nil {
 		return nil, false, err
 	}

@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"encoding/base64"
-	"os"
 
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -46,7 +45,7 @@ func (b *backend) install(ctx context.Context, log *logrus.Entry, doc *api.OpenS
 
 	platformCreds := &installconfig.PlatformCreds{
 		Azure: &icazure.Credentials{
-			TenantID:       os.Getenv("AZURE_TENANT_ID"),
+			TenantID:       b.TenantID,
 			ClientID:       doc.OpenShiftCluster.Properties.ServicePrincipalProfile.ClientID,
 			ClientSecret:   doc.OpenShiftCluster.Properties.ServicePrincipalProfile.ClientSecret,
 			SubscriptionID: doc.SubscriptionID,
@@ -106,14 +105,14 @@ func (b *backend) install(ctx context.Context, log *logrus.Entry, doc *api.OpenS
 				Azure: &azuretypes.Platform{
 					Region:                      doc.OpenShiftCluster.Location,
 					ResourceGroupName:           doc.OpenShiftCluster.Properties.ResourceGroup,
-					BaseDomainResourceGroupName: os.Getenv("RESOURCEGROUP"),
+					BaseDomainResourceGroupName: b.ResourceGroup,
 					NetworkResourceGroupName:    r.ResourceGroup,
 					VirtualNetwork:              r.ResourceName,
 					ControlPlaneSubnet:          masterSubnetName,
 					ComputeSubnet:               workerSubnetName,
 				},
 			},
-			PullSecret: string(os.Getenv("PULL_SECRET")),
+			PullSecret: string(b.PullSecret),
 			Publish:    types.ExternalPublishingStrategy,
 		},
 	}

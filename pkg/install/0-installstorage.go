@@ -254,7 +254,7 @@ func (i *Installer) installStorage(ctx context.Context, doc *api.OpenShiftCluste
 		i.log.Printf("attaching network security group to subnet %s", subnetID)
 
 		// TODO: there is probably an undesirable race condition here - check if etags can help.
-		s, err := subnet.Get(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID)
+		s, err := subnet.Get(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID, i.TenantID)
 		if err != nil {
 			return err
 		}
@@ -267,7 +267,7 @@ func (i *Installer) installStorage(ctx context.Context, doc *api.OpenShiftCluste
 			ID: to.StringPtr(nsgID),
 		}
 
-		err = subnet.CreateOrUpdate(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID, s)
+		err = subnet.CreateOrUpdate(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID, i.TenantID, s)
 		if err != nil {
 			return err
 		}

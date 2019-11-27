@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/sirupsen/logrus"
 
@@ -15,12 +16,14 @@ type dev struct {
 	*shared.Shared
 }
 
-func New(ctx context.Context, log *logrus.Entry, subscriptionId, resourceGroup string) (*dev, error) {
+func IsDevelopment() bool {
+	return os.Getenv("RP_MODE") == "development"
+}
+
+func New(ctx context.Context, log *logrus.Entry) (*dev, error) {
 	var err error
-
 	d := &dev{}
-
-	d.Shared, err = shared.NewShared(ctx, log, subscriptionId, resourceGroup)
+	d.Shared, err = shared.NewShared(ctx, log)
 	if err != nil {
 		return nil, err
 	}

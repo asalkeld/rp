@@ -17,14 +17,14 @@ type prod struct {
 	ms *metadataService
 }
 
-func New(ctx context.Context, log *logrus.Entry, subscriptionId, resourceGroup string) (*prod, error) {
+func New(ctx context.Context, log *logrus.Entry) (*prod, error) {
 	var err error
 
 	p := &prod{
 		ms: NewMetadataService(log),
 	}
 
-	p.Shared, err = shared.NewShared(ctx, log, subscriptionId, resourceGroup)
+	p.Shared, err = shared.NewShared(ctx, log)
 	if err != nil {
 		return nil, err
 	}

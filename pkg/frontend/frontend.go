@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gorilla/mux"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 
 	"github.com/jim-minter/rp/pkg/api"
@@ -50,6 +51,9 @@ type frontend struct {
 	l net.Listener
 
 	ready atomic.Value
+
+	Location string `envconfig:"LOCATION" required:"true"`
+	TenantID string `envconfig:"AZURE_TENANT_ID" required:"true"`
 }
 
 // Runnable represents a runnable object
@@ -64,8 +68,11 @@ func NewFrontend(ctx context.Context, baseLog *logrus.Entry, env env.Interface, 
 		env:     env,
 		db:      db,
 	}
-
 	var err error
+	if err = envconfig.Process("", &f); err != nil {
+		return nil, err
+	}
+
 	f.l, err = f.env.ListenTLS(ctx)
 	if err != nil {
 		return nil, err

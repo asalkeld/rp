@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
@@ -23,7 +22,7 @@ func (b *backend) delete(ctx context.Context, log *logrus.Entry, doc *api.OpenSh
 	groups.Client.PollingDuration = time.Hour
 
 	log.Printf("deleting dns")
-	_, err := recordsets.Delete(ctx, os.Getenv("RESOURCEGROUP"), b.domain, "api."+doc.OpenShiftCluster.Name, dns.CNAME, "")
+	_, err := recordsets.Delete(ctx, b.ResourceGroup, b.domain, "api."+doc.OpenShiftCluster.Name, dns.CNAME, "")
 	if err != nil {
 		return err
 	}
@@ -34,7 +33,7 @@ func (b *backend) delete(ctx context.Context, log *logrus.Entry, doc *api.OpenSh
 		doc.OpenShiftCluster.Properties.WorkerProfiles[0].SubnetID,
 	} {
 		// TODO: there is probably an undesirable race condition here - check if etags can help.
-		s, err := subnet.Get(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID)
+		s, err := subnet.Get(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID, b.TenantID)
 		if err != nil {
 			return err
 		}
@@ -43,7 +42,7 @@ func (b *backend) delete(ctx context.Context, log *logrus.Entry, doc *api.OpenSh
 			s.SubnetPropertiesFormat.NetworkSecurityGroup = nil
 
 			log.Printf("removing network security group from subnet %s", subnetID)
-			err = subnet.CreateOrUpdate(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID, s)
+			err = subnet.CreateOrUpdate(ctx, &doc.OpenShiftCluster.Properties.ServicePrincipalProfile, subnetID, b.TenantID, s)
 			if err != nil {
 				return err
 			}

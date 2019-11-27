@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/Azure/azure-sdk-for-go/services/cosmos-db/mgmt/2015-04-08/documentdb"
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
@@ -17,6 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,11 +26,22 @@ type Shared struct {
 	vaults           keyvaultmgmt.VaultsClient
 	zones            dns.ZonesClient
 
-	resourceGroup string
-	vaultURI      string
+	vaultURI string
+
+	Location       string `envconfig:"LOCATION" required:"true"`
+	SubscriptionID string `envconfig:"AZURE_SUBSCRIPTION_ID" required:"true"`
+	TenantID       string `envconfig:"AZURE_TENANT_ID" required:"true"`
+	ClientID       string `envconfig:"AZURE_CLIENT_ID" required:"true"`
+	ClientSecret   string `envconfig:"AZURE_CLIENT_SECRET" required:"true"`
+	ResourceGroup  string `envconfig:"RESOURCEGROUP" required:"true"`
 }
 
-func NewShared(ctx context.Context, log *logrus.Entry, subscriptionId, resourceGroup string) (*Shared, error) {
+func NewShared(ctx context.Context, log *logrus.Entry) (*Shared, error) {
+	s := &Shared{}
+	if err := envconfig.Process("", &s); err != nil {
+		return nil, err
+	}
+
 	authorizer, err := auth.NewAuthorizerFromEnvironment()
 	if err != nil {
 		return nil, err
@@ -41,21 +52,17 @@ func NewShared(ctx context.Context, log *logrus.Entry, subscriptionId, resourceG
 		return nil, err
 	}
 
-	s := &Shared{
-		resourceGroup: resourceGroup,
-	}
-
-	s.databaseaccounts = documentdb.NewDatabaseAccountsClient(subscriptionId)
+	s.databaseaccounts = documentdb.NewDatabaseAccountsClient(s.SubscriptionID)
 	s.keyvault = keyvault.New()
-	s.vaults = keyvaultmgmt.NewVaultsClient(subscriptionId)
-	s.zones = dns.NewZonesClient(subscriptionId)
+	s.vaults = keyvaultmgmt.NewVaultsClient(s.SubscriptionID)
+	s.zones = dns.NewZonesClient(s.SubscriptionID)
 
 	s.databaseaccounts.Authorizer = authorizer
 	s.keyvault.Authorizer = vaultauthorizer
 	s.vaults.Authorizer = authorizer
 	s.zones.Authorizer = authorizer
 
-	page, err := s.vaults.ListByResourceGroup(ctx, s.resourceGroup, nil)
+	page, err := s.vaults.ListByResourceGroup(ctx, s.ResourceGroup, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +77,7 @@ func NewShared(ctx context.Context, log *logrus.Entry, subscriptionId, resourceG
 }
 
 func (s *Shared) CosmosDB(ctx context.Context) (string, string, error) {
-	accts, err := s.databaseaccounts.ListByResourceGroup(ctx, s.resourceGroup)
+	accts, err := s.databaseaccounts.ListByResourceGroup(ctx, s.ResourceGroup)
 	if err != nil {
 		return "", "", err
 	}
@@ -79,7 +86,7 @@ func (s *Shared) CosmosDB(ctx context.Context) (string, string, error) {
 		return "", "", fmt.Errorf("found %d database accounts, expected 1", len(*accts.Value))
 	}
 
-	keys, err := s.databaseaccounts.ListKeys(ctx, s.resourceGroup, *(*accts.Value)[0].Name)
+	keys, err := s.databaseaccounts.ListKeys(ctx, s.ResourceGroup, *(*accts.Value)[0].Name)
 	if err != nil {
 		return "", "", err
 	}
@@ -88,7 +95,7 @@ func (s *Shared) CosmosDB(ctx context.Context) (string, string, error) {
 }
 
 func (s *Shared) DNS(ctx context.Context) (string, error) {
-	page, err := s.zones.ListByResourceGroup(ctx, s.resourceGroup, nil)
+	page, err := s.zones.ListByResourceGroup(ctx, s.ResourceGroup, nil)
 	if err != nil {
 		return "", err
 	}
@@ -146,12 +153,12 @@ func (s *Shared) FirstPartyAuthorizer(ctx context.Context) (autorest.Authorizer,
 		return nil, err
 	}
 
-	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, os.Getenv("AZURE_TENANT_ID"))
+	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, s.TenantID)
 	if err != nil {
 		return nil, err
 	}
 
-	sp, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, os.Getenv("AZURE_CLIENT_ID"), cert, key, azure.PublicCloud.ResourceManagerEndpoint)
+	sp, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, s.ClientID, cert, key, azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return nil, err
 	}
