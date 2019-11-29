@@ -931,9 +931,10 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2f12deac21dd95601b0c44b46deaab1cd107b853ef6f2eea5893e8a72324c274"
+  digest = "1:5e766afe6b40245ebbdc85a6d3e16bc71eac3280796ef05b086c76da836d95b1"
   name = "golang.org/x/tools"
   packages = [
+    "cmd/goimports",
     "go/ast/astutil",
     "go/gcexportdata",
     "go/internal/gcimporter",
@@ -942,6 +943,8 @@
     "go/types/typeutil",
     "internal/fastwalk",
     "internal/gopathwalk",
+    "internal/imports",
+    "internal/module",
     "internal/semver",
     "internal/span",
   ]
@@ -1375,6 +1378,7 @@
     "github.com/sirupsen/logrus",
     "github.com/ugorji/go/codec",
     "golang.org/x/crypto/ssh",
+    "golang.org/x/tools/cmd/goimports",
     "golang.org/x/tools/go/ast/astutil",
     "golang.org/x/tools/go/packages",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
