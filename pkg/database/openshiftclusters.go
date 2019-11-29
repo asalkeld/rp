@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/azure"
 	uuid "github.com/satori/go.uuid"
+	"github.com/ugorji/go/codec"
 
 	"github.com/jim-minter/rp/pkg/api"
 	"github.com/jim-minter/rp/pkg/database/cosmosdb"
@@ -38,7 +39,14 @@ func NewOpenShiftClusters(ctx context.Context, env env.Interface, uuid uuid.UUID
 		return nil, err
 	}
 
-	dbc, err := cosmosdb.NewDatabaseClient(http.DefaultClient, databaseAccount, masterKey)
+	jh := &codec.JsonHandle{
+		BasicHandle: codec.BasicHandle{
+			DecodeOptions: codec.DecodeOptions{
+				ErrorIfNoField: true,
+			},
+		},
+	}
+	dbc, err := cosmosdb.NewDatabaseClient(http.DefaultClient, jh, databaseAccount, masterKey)
 	if err != nil {
 		return nil, err
 	}

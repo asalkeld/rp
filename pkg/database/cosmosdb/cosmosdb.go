@@ -2,10 +2,5 @@
 
 package cosmosdb
 
-import (
-	"github.com/jim-minter/rp/pkg/api"
-)
-
 func init() {
-	api.AddExtensions(&JSONHandle.BasicHandle)
 }
