@@ -27,6 +27,7 @@ type Interface interface {
 	Authenticated(http.Handler) http.Handler
 	Location() string
 	ResourceGroup() string
+	PullSecret() string
 }
 
 func NewEnv(ctx context.Context, log *logrus.Entry) (Interface, error) {

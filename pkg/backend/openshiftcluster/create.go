@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"math/big"
-	"os"
 
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -151,7 +150,7 @@ func (m *Manager) Create(ctx context.Context) error {
 					ComputeSubnet:               workerSubnetName,
 				},
 			},
-			PullSecret: string(os.Getenv("PULL_SECRET")),
+			PullSecret: m.env.PullSecret(),
 			Publish:    types.ExternalPublishingStrategy,
 		},
 	}

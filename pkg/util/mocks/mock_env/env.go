@@ -141,6 +141,20 @@ func (mr *MockInterfaceMockRecorder) Location() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Location", reflect.TypeOf((*MockInterface)(nil).Location))
 }
 
+// PullSecret mocks base method
+func (m *MockInterface) PullSecret() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PullSecret")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// PullSecret indicates an expected call of PullSecret
+func (mr *MockInterfaceMockRecorder) PullSecret() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PullSecret", reflect.TypeOf((*MockInterface)(nil).PullSecret))
+}
+
 // ResourceGroup mocks base method
 func (m *MockInterface) ResourceGroup() string {
 	m.ctrl.T.Helper()

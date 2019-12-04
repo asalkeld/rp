@@ -85,6 +85,10 @@ func NewShared(ctx context.Context, log *logrus.Entry, tenantID, subscriptionID,
 	return s, nil
 }
 
+func (s *Shared) PullSecret() string {
+	return string(os.Getenv("PULL_SECRET"))
+}
+
 func (s *Shared) CosmosDB(ctx context.Context) (string, string, error) {
 	accts, err := s.databaseaccounts.ListByResourceGroup(ctx, s.resourceGroup)
 	if err != nil {
