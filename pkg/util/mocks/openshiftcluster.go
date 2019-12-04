@@ -25,6 +25,7 @@ func MockOpenShiftCluster() *api.OpenShiftCluster {
 		Location: testLocation,
 		Properties: api.Properties{
 			StorageSuffix: "keep",
+			ResourceGroup: "testrg",
 			DomainName:    "dommy",
 			APIServerURL:  "url",
 			ConsoleURL:    "url",
@@ -34,8 +35,8 @@ func MockOpenShiftCluster() *api.OpenShiftCluster {
 				ClientSecret: "hidden",
 			},
 			NetworkProfile: api.NetworkProfile{
-				PodCIDR:     "10.0.0.0/18",
-				ServiceCIDR: "10.0.1.0/22",
+				PodCIDR:     "10.128.0.0/14",
+				ServiceCIDR: "172.30.0.0/16",
 			},
 			MasterProfile: api.MasterProfile{
 				VMSize:   api.VMSizeStandardD8sV3,

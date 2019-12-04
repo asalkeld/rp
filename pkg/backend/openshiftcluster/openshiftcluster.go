@@ -8,6 +8,7 @@ import (
 	"github.com/jim-minter/rp/pkg/api"
 	"github.com/jim-minter/rp/pkg/database"
 	"github.com/jim-minter/rp/pkg/env"
+	"github.com/jim-minter/rp/pkg/install"
 	"github.com/jim-minter/rp/pkg/util/azureclient/resources"
 	"github.com/jim-minter/rp/pkg/util/subnet"
 )
@@ -20,7 +21,8 @@ type Manager struct {
 
 	groups resources.GroupsClient
 
-	subnets subnet.Manager
+	subnets   subnet.Manager
+	installer install.Interface
 
 	doc *api.OpenShiftClusterDocument
 }
