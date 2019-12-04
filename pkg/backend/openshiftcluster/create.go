@@ -160,7 +160,11 @@ func (m *Manager) Create(ctx context.Context) error {
 		return err
 	}
 
-	return install.NewInstaller(m.log, m.env, m.db, m.fpAuthorizer, r.SubscriptionID).Install(ctx, m.doc, installConfig, platformCreds)
+	if m.installer == nil {
+		m.installer = install.NewInstaller(m.log, m.env, m.db, m.fpAuthorizer, r.SubscriptionID)
+	}
+
+	return m.installer.Install(ctx, m.doc, installConfig, platformCreds)
 }
 
 func randomDomainName() (string, error) {

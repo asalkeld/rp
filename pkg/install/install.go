@@ -1,5 +1,8 @@
 package install
 
+//go:generate go run ../../vendor/github.com/golang/mock/mockgen -destination=../util/mocks/mock_$GOPACKAGE/$GOPACKAGE.go github.com/jim-minter/rp/pkg/$GOPACKAGE Interface
+//go:generate go run ../../vendor/golang.org/x/tools/cmd/goimports -local=github.com/jim-minter/rp -e -w ../util/mocks/mock_$GOPACKAGE/$GOPACKAGE.go
+
 import (
 	"context"
 	"encoding/json"
@@ -25,6 +28,10 @@ import (
 	"github.com/jim-minter/rp/pkg/util/subnet"
 )
 
+type Interface interface {
+	Install(ctx context.Context, doc *api.OpenShiftClusterDocument, installConfig *installconfig.InstallConfig, platformCreds *installconfig.PlatformCreds) error
+}
+
 type Installer struct {
 	log          *logrus.Entry
 	env          env.Interface
@@ -42,7 +49,9 @@ type Installer struct {
 	subnets subnet.Manager
 }
 
-func NewInstaller(log *logrus.Entry, env env.Interface, db database.OpenShiftClusters, fpAuthorizer autorest.Authorizer, subscriptionID string) *Installer {
+var _ Interface = &Installer{}
+
+func NewInstaller(log *logrus.Entry, env env.Interface, db database.OpenShiftClusters, fpAuthorizer autorest.Authorizer, subscriptionID string) Interface {
 	return &Installer{
 		log:          log,
 		env:          env,
