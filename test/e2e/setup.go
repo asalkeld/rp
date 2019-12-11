@@ -3,9 +3,11 @@ package e2e
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"net/http"
 	"os"
 	"time"
 
@@ -27,7 +29,6 @@ import (
 	"github.com/jim-minter/rp/pkg/util/arm"
 	"github.com/jim-minter/rp/pkg/util/azureclient/authorization"
 	"github.com/jim-minter/rp/pkg/util/azureclient/resources"
-	utilpermissions "github.com/jim-minter/rp/pkg/util/permissions"
 	utillog "github.com/jim-minter/rp/test/util/log"
 )
 
@@ -47,9 +48,15 @@ type clientSet struct {
 	openshiftclusters redhatopenshift.OpenShiftClustersClient
 }
 
+var (
+	kubeadminPassword string
+	apiVersions       = map[string]string{
+		"network": "2019-07-01", // copied from 0-installstorage
+	}
+)
+
 func newClientSet(log *logrus.Entry, location, subID, tenantID, rg string) (*clientSet, error) {
-	// TODO ask Jim to create this account and insert it into secrets
-	conf := auth.NewClientCredentialsConfig(os.Getenv("AZURE_CI_CLIENT_ID"), os.Getenv("AZURE_CI_CLIENT_SECRET"), tenantID)
+	conf := auth.NewClientCredentialsConfig(os.Getenv("AZURE_E2E_CLIENT_ID"), os.Getenv("AZURE_E2E_CLIENT_SECRET"), tenantID)
 	authorizer, err := conf.Authorizer()
 	if err != nil {
 		return nil, err
@@ -71,9 +78,16 @@ func newClientSet(log *logrus.Entry, location, subID, tenantID, rg string) (*cli
 		applications:      graphrbac.NewApplicationsClient(tenantID),
 		deployments:       resources.NewDeploymentsClient(subID, authorizer),
 		groups:            resources.NewGroupsClient(subID, authorizer),
-		openshiftclusters: redhatopenshift.NewOpenShiftClustersClient(subID),
+		openshiftclusters: redhatopenshift.NewOpenShiftClustersClientWithBaseURI("https://localhost:8443", subID),
 	}
-	cs.openshiftclusters.Authorizer = authorizer
+	cs.openshiftclusters.PollingDuration = time.Minute * 90
+	cs.openshiftclusters.Sender = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
 	cs.applications.Authorizer = graphAuthorizer
 	return cs, nil
 }
@@ -84,9 +98,10 @@ func (c *clientSet) assignVnetRoleTo(ctx context.Context, assigneeID string) err
 		return err
 	}
 
-	_, err = c.roleassignments.Create(ctx, "/subscriptions/"+c.subID+"/resourceGroups/"+c.rg, uuid.NewV4().String(), mgmtauthorization.RoleAssignmentCreateParameters{
+	scope := "/subscriptions/" + c.subID + "/resourceGroups/" + c.rg + "/providers/Microsoft.Network/virtualNetworks/vnet"
+	_, err = c.roleassignments.Create(ctx, scope, uuid.NewV4().String(), mgmtauthorization.RoleAssignmentCreateParameters{
 		Properties: &mgmtauthorization.RoleAssignmentProperties{
-			RoleDefinitionID: to.StringPtr("/subscriptions/" + c.subID + "/providers/Microsoft.Authorization/roleDefinitions/c95361b8-cf7c-40a1-ad0a-df9f39a30225"),
+			RoleDefinitionID: to.StringPtr("/subscriptions/" + c.subID + "/providers/Microsoft.Authorization/roleDefinitions/f3fe7bc1-0ef9-4681-a68c-c1fa285d6128"),
 			PrincipalID:      res.Value,
 		},
 	})
@@ -101,20 +116,6 @@ func (c *clientSet) assignVnetRoleTo(ctx context.Context, assigneeID string) err
 			return err
 		}
 	}
-	// try removing the code below after a bit if we don't hit the error
-	permissions, err := c.permissions.ListForResourceGroup(ctx, c.rg)
-	if err != nil {
-		return err
-	}
-
-	ok, err := utilpermissions.CanDoAction(permissions, "Microsoft.Storage/storageAccounts/write")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("Microsoft.Storage/storageAccounts/write permission not found")
-	}
-
 	return nil
 }
 
@@ -140,9 +141,15 @@ func (c *clientSet) ensureResourceGroup(ctx context.Context) error {
 }
 
 func (c *clientSet) checkResourceGroupIsReady(ctx context.Context) (bool, error) {
-	_, err := c.groups.CheckExistence(ctx, c.rg)
+	resp, err := c.groups.CheckExistence(ctx, c.rg)
 	if err != nil {
 		return false, err
+	}
+	if resp.Response.StatusCode == http.StatusNotFound {
+		return false, nil
+	}
+	if resp.Response.StatusCode != http.StatusNoContent {
+		c.log.Debugf("resp: %v", resp.Response.StatusCode)
 	}
 	return true, nil
 }
@@ -157,7 +164,7 @@ func randomAddressPrefix() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("10.%v.%v.0/24", *a, *b), nil
+	return fmt.Sprintf("10.%s.%s.0/24", a.String(), b.String()), nil
 }
 
 func (c *clientSet) createVnet(ctx context.Context, clusterName, vnetName string) error {
@@ -169,9 +176,6 @@ func (c *clientSet) createVnet(ctx context.Context, clusterName, vnetName string
 	if err != nil {
 		return err
 	}
-	// az network vnet create -g "$VNET_RESOURCEGROUP" -n vnet --address-prefixes 10.0.0.0/9
-	//	az network vnet subnet create -g "$VNET_RESOURCEGROUP" --vnet-name vnet -n "$CLUSTER-master" --address-prefixes 10.$((RANDOM & 127)).$((RANDOM & 255)).0/24
-	//	az network vnet subnet create -g "$VNET_RESOURCEGROUP" --vnet-name vnet -n "$CLUSTER-worker" --address-prefixes 10.$((RANDOM & 127)).$((RANDOM & 255)).0/24
 	t := &arm.Template{
 		Schema:         "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
 		ContentVersion: "1.0.0.0",
@@ -203,6 +207,7 @@ func (c *clientSet) createVnet(ctx context.Context, clusterName, vnetName string
 					Type:     to.StringPtr("Microsoft.Network/virtualNetworks"),
 					Location: to.StringPtr(c.location),
 				},
+				APIVersion: apiVersions["network"],
 			},
 		},
 	}
@@ -216,12 +221,12 @@ func (c *clientSet) createVnet(ctx context.Context, clusterName, vnetName string
 	if err != nil {
 		return err
 	}
-	c.log.Infof("assigning role to AZURE_FP_CLIENT_ID for vnet")
+	c.log.Debugf("assigning role to AZURE_FP_CLIENT_ID for vnet")
 	err = c.assignVnetRoleTo(ctx, os.Getenv("AZURE_FP_CLIENT_ID"))
 	if err != nil {
 		return err
 	}
-	c.log.Infof("assigning role to AZURE_CLUSTER_CLIENT_ID for vnet")
+	c.log.Debugf("assigning role to AZURE_CLUSTER_CLIENT_ID for vnet")
 	err = c.assignVnetRoleTo(ctx, os.Getenv("AZURE_CLUSTER_CLIENT_ID"))
 	if err != nil {
 		return err
@@ -229,8 +234,22 @@ func (c *clientSet) createVnet(ctx context.Context, clusterName, vnetName string
 	return nil
 }
 
+func (c *clientSet) getKubeAdminPassword(ctx context.Context, clusterName string) error {
+	c.log.Info("getting kube admin password")
+	cred, err := c.openshiftclusters.GetCredentials(ctx, clusterName, clusterName)
+	if err != nil {
+		return err
+	}
+	if cred.KubeadminPassword != nil {
+		kubeadminPassword = *cred.KubeadminPassword
+	} else {
+		c.log.Warnf("KubeadminPassword is empty")
+	}
+	return nil
+}
+
 func (c *clientSet) createCluster(ctx context.Context, vnetRG, clusterName string) error {
-	b, err := ioutil.ReadFile("test/e2e/cluster.json")
+	b, err := ioutil.ReadFile("cluster.json")
 	if err != nil {
 		return err
 	}
@@ -240,11 +259,13 @@ func (c *clientSet) createCluster(ctx context.Context, vnetRG, clusterName strin
 	if err != nil {
 		return err
 	}
+	c.log.Infof("creating cluster %s", clusterName)
 	future, err := c.openshiftclusters.Create(ctx, clusterName, clusterName, oc)
 	if err != nil {
 		return err
 	}
 
+	c.log.Infof("waiting for cluster %s", clusterName)
 	return future.WaitForCompletionRef(ctx, c.openshiftclusters.Client)
 }
 
@@ -260,8 +281,13 @@ var _ = AfterSuite(func() {
 		logger.Fatal(err)
 		return
 	}
+	if os.Getenv("E2E_NO_DELETE") == "true" {
+		logger.Warn("E2E_NO_DELETE set, not deleting the test cluster")
+		return
+	}
 
 	ctx := context.Background()
+	logger.Infof("AfterSuite deleting cluster %s", os.Getenv("CLUSTER"))
 	future, err := cs.openshiftclusters.Delete(ctx, os.Getenv("CLUSTER"), os.Getenv("CLUSTER"))
 	if err != nil {
 		logger.Error(err)
@@ -270,6 +296,12 @@ var _ = AfterSuite(func() {
 	if err != nil {
 		logger.Error(err)
 	}
+	logger.Infof("AfterSuite deleting vnet %s", cs.rg)
+	err = cs.deployments.DeleteAndWait(ctx, cs.rg, "azuredeploy")
+	if err != nil {
+		logger.Error(err)
+	}
+	logger.Infof("AfterSuite deleting vnet resource group %s", cs.rg)
 	err = cs.groups.DeleteAndWait(ctx, cs.rg)
 	if err != nil {
 		logger.Error(err)
@@ -278,6 +310,18 @@ var _ = AfterSuite(func() {
 
 var _ = BeforeSuite(func() {
 	logger := utillog.GetTestLogger()
+	for _, key := range []string{
+		"LOCATION", "AZURE_SUBSCRIPTION_ID", "AZURE_TENANT_ID",
+		"CLUSTER", "VNET_RESOURCEGROUP",
+		"AZURE_ARM_CLIENT_ID", "AZURE_FP_CLIENT_ID", "AZURE_CLUSTER_CLIENT_ID",
+		"AZURE_E2E_CLIENT_ID", "AZURE_E2E_CLIENT_SECRET",
+	} {
+		if _, found := os.LookupEnv(key); !found {
+			logger.Errorf("environment variable %q unset", key)
+			return
+		}
+	}
+
 	cs, err := newClientSet(
 		logger,
 		os.Getenv("LOCATION"),
@@ -285,25 +329,39 @@ var _ = BeforeSuite(func() {
 		os.Getenv("AZURE_TENANT_ID"),
 		os.Getenv("VNET_RESOURCEGROUP"))
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err)
 		return
 	}
-
 	ctx := context.Background()
+
+	if os.Getenv("E2E_NO_CREATE") == "true" {
+		logger.Warn("E2E_NO_CREATE set, not creating the test cluster")
+		err = cs.getKubeAdminPassword(ctx, os.Getenv("CLUSTER"))
+		if err != nil {
+			logger.Error(err)
+		}
+		return
+	}
+	logger.Info("BeforeSuite creating the cluster")
+
 	err = cs.ensureResourceGroup(ctx)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err)
 		return
 	}
 	err = cs.createVnet(ctx, os.Getenv("CLUSTER"), "vnet")
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err)
 		return
 	}
 	err = cs.createCluster(ctx, os.Getenv("VNET_RESOURCEGROUP"), os.Getenv("CLUSTER"))
 	if err != nil {
-		logger.Fatal(err)
+		logger.Error(err)
 		return
 	}
-	// TODO get the kubeconfig and create a client for the tests.
+	err = cs.getKubeAdminPassword(ctx, os.Getenv("CLUSTER"))
+	if err != nil {
+		logger.Error(err)
+		return
+	}
 })
