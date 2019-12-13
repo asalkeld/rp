@@ -152,14 +152,15 @@ func (d *dev) CreateARMResourceGroupRoleAssignment(ctx context.Context, fpAuthor
 	if err != nil {
 		return err
 	}
+	for _, action := range []string{"Microsoft.Storage/storageAccounts/write", "Microsoft.Resources/deployments/write"} {
+		ok, err := utilpermissions.CanDoAction(permissions, action)
+		if err != nil {
+			return err
+		}
 
-	ok, err := utilpermissions.CanDoAction(permissions, "Microsoft.Storage/storageAccounts/write")
-	if err != nil {
-		return err
-	}
-
-	if !ok {
-		return fmt.Errorf("Microsoft.Storage/storageAccounts/write permission not found")
+		if !ok {
+			return fmt.Errorf(action + " permission not found")
+		}
 	}
 
 	return nil
