@@ -34,7 +34,6 @@ func (f *frontend) putOrPatchOpenShiftCluster(w http.ResponseWriter, r *http.Req
 }
 
 func (f *frontend) _putOrPatchOpenShiftCluster(r *http.Request, internal api.OpenShiftClusterToInternal, external api.OpenShiftClusterToExternal) ([]byte, bool, error) {
-	vars := mux.Vars(r)
 	body := r.Context().Value(middleware.ContextKeyBody).([]byte)
 
 	subdoc, err := f.validateSubscriptionState(api.Key(r.URL.Path), api.SubscriptionStateRegistered)
@@ -66,7 +65,7 @@ func (f *frontend) _putOrPatchOpenShiftCluster(r *http.Request, internal api.Ope
 				Properties: api.Properties{
 					ProvisioningState: api.ProvisioningStateSucceeded,
 					// TODO: ResourceGroup should be exposed in external API
-					ResourceGroup: vars["resourceName"],
+					ResourceGroup: originalR.ResourceGroup,
 					ServicePrincipalProfile: api.ServicePrincipalProfile{
 						TenantID: subdoc.Subscription.Properties.TenantID,
 					},
