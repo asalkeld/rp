@@ -2,10 +2,8 @@ package e2e
 
 import (
 	"context"
-	"crypto/tls"
-	"net/http"
-	"os"
-	"time"
+
+	"github.com/Azure/go-autorest/autorest/to"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -14,40 +12,29 @@ import (
 )
 
 var _ = Describe("Scale Up/Down E2E tests [ScaleUpDown][EveryPR][LongRunning]", func() {
-	openshiftclusters := redhatopenshift.NewOpenShiftClustersClientWithBaseURI("https://localhost:8443", os.Getenv("AZURE_SUBSCRIPTION_ID"))
-	openshiftclusters.PollingDuration = time.Minute * 90
-	openshiftclusters.Sender = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
 	scale := func(count int32) {
 		ctx := context.Background()
-		By("Fetching the manifest")
-		external, err := openshiftclusters.Get(ctx, os.Getenv("CLUSTER"), os.Getenv("CLUSTER"))
-		Expect(err).NotTo(HaveOccurred())
-
-		err = setCount(&external, count)
-		Expect(err).NotTo(HaveOccurred())
+		external := redhatopenshift.OpenShiftCluster{
+			Properties: &redhatopenshift.Properties{
+				WorkerProfiles: &[]redhatopenshift.WorkerProfile{
+					{
+						Count: to.Int32Ptr(count),
+					},
+				},
+			},
+		}
 
 		By("Calling Update on the rp with the scale up manifest")
-		future, err := openshiftclusters.Update(ctx, os.Getenv("CLUSTER"), os.Getenv("CLUSTER"), external)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("waiting for cluster to scale")
-		err = future.WaitForCompletionRef(ctx, openshiftclusters.Client)
+		err := Clients.openshiftclusters.UpdateAndWait(ctx, Clients.ClusterRG, Clients.ClusterName, external)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
 	It("should be possible to maintain a healthy cluster after scaling it out and in", func() {
 		By("Scaling up")
-		scale(2)
+		scale(4)
 
 		By("Scaling down")
-		scale(1)
+		scale(3)
 	})
 })
 

@@ -1,0 +1,29 @@
+{
+  "id": "/subscriptions/{{ .SubscriptionID }}/resourcegroups/{{ .ClusterRG }}/providers/Microsoft.RedHatOpenShift/openShiftClusters/{{ .ClusterName }}",
+  "name": "{{ .ClusterName }}",
+  "type": "Microsoft.RedHatOpenShift/openShiftClusters",
+  "location": "{{ .Location }}",
+  "properties": {
+    "servicePrincipalProfile": {
+      "clientId": "{{ .ClusterClientID }}",
+      "clientSecret": "{{ .ClusterClientSecret }}"
+    },
+    "networkProfile": {
+      "podCidr": "10.128.0.0/14",
+      "serviceCidr": "172.30.0.0/16"
+    },
+    "masterProfile": {
+      "vmSize": "Standard_D8s_v3",
+      "subnetId": "/subscriptions/{{ .SubscriptionID }}/resourcegroups/{{ .VnetRG }}/providers/Microsoft.Network/virtualNetworks/vnet/subnets/{{ .ClusterName }}-master"
+    },
+    "workerProfiles": [
+      {
+        "name": "worker",
+        "vmSize": "Standard_D2s_v3",
+        "diskSizeGB": 128,
+        "subnetId": "/subscriptions/{{ .SubscriptionID }}/resourcegroups/{{ .VnetRG }}/providers/Microsoft.Network/virtualNetworks/vnet/subnets/{{ .ClusterName }}-worker",
+        "count": 3
+      }
+    ]
+  }
+}

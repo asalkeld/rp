@@ -64,9 +64,7 @@ secrets-update:
 	oc create secret generic aro-v4-dev --from-file=secrets --dry-run -o yaml | oc apply -f -
 
 e2e:
-	envsubst <examples/cluster-v20191231.json > test/e2e/cluster.json
 	go test -race ./test/e2e -timeout "60m" -v -ginkgo.v -tags e2e
-	rm -f test/e2e/cluster.json
 
 test-go: generate
 	go build ./...
